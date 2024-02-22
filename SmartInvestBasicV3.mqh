@@ -21,7 +21,7 @@
 FIXURI
 2024.01.12  - Fix pentru lateStart si Multiplier
             - Fix pentru afisarea NextLot in Dashboard  (needsTesting)
-
+2024.02.22  - Fix lot formula (removed "+1")
 
 
 BUG cu calcularea distantei -> PriceCurrent vs Price open asta imi compara bid cu ask in loc sa compare bid cu bid si ask cu ask 399 (done)
@@ -454,7 +454,7 @@ double CSmartInvestV3::GetLots()
    if(_sTradeDetails.totalPositions < mLateStart || !mIsMartingale)
       return mLot;
 
-   double lots =  CRiskService::GetVolumeBasedOnMartinGaleBatch(_sTradeDetails.totalPositions - mLateStart + 1, mFactor, mSymbol, mLot, ENUM_TYPE_MARTINGALE_MULTIPLICATION);
+   double lots =  CRiskService::GetVolumeBasedOnMartinGaleBatch(_sTradeDetails.totalPositions - mLateStart, mFactor, mSymbol, mLot, ENUM_TYPE_MARTINGALE_MULTIPLICATION);
 
    return (lots <= mMaxLot) ? lots : mMaxLot;
 }
@@ -510,7 +510,7 @@ void CSmartInvestV3::DisplayExpertInfo(void)
    string space = "                                                                       ";
    string dashboard = space + "SmartInvestBasic Dashboard";
    dashboard += "\n" + space + "Direction: " + EnumToString(_direction);
-   dashboard += "\n" + space + "Current Gap: " + IntegerToString(_currentGap);
+   //dashboard += "\n" + space + "Current Gap: " + IntegerToString(_currentGap);
    dashboard += "\n" + space + "Number of Positions: " + IntegerToString(_sTradeDetails.totalPositions);
    dashboard += "\n" + space + "Next Volume: " + DoubleToString(GetLots(), 2);
    dashboard += "\n" + space + "DrawDown: " + DoubleToString(GetDrawDown(), 4) + " " + drawDownType;
