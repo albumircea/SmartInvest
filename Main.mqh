@@ -10,7 +10,7 @@
 #include "SmartInvestBasicV3.mqh"
 
 
-LOGGER_DEFINE_FILENAME("SmartInvestBasic");
+LOGGER_DEFINE_FILENAME("SmartInvest");
 
 //+------------------------------------------------------------------+
 //|                                                                  |

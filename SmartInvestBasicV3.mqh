@@ -7,15 +7,8 @@
 #property link      "https://www.mql5.com"
 
 
-//LOG LEVEL SET IN PARAMETERS INFO/ERROR sau loge info true sau false
 
-#include <Mircea/_profitpoint/Base/ExpertBase.mqh>
-#include <Mircea/_profitpoint/Trade/TradeManager.mqh>
-#include <Mircea/RiskManagement/RiskService.mqh>
-#include <Mircea/_profitpoint/Mql/CandleInfo.mqh>
-#include <Mircea/RiskManagement/RiskService.mqh>
-#include <Mircea/ExpertAdvisors/Hedge/HedgeCandles.mqh>
-
+#include "SmartInvestBasicParams.mqh"
 
 /*
 FIXURI
@@ -49,105 +42,6 @@ Incep complementarea direct sau de la a doua tranzactie de complementare VARIANT
       asta inseamnca ca am profit cu 1 lot 50p si minus cu 0.1 de exemplu 400 puncte acel 1 lot trebuie sa compenseze acel 0.1
 -> din profituri pot sa si inchid din volumele existente de mediere de la un anumit punct inainte si sa reduc distanta pana la TP (inchid trade pe plus, inchid volume, modific TP)
 */
-datetime lastOnTimerExecution;
-int timeToWaitInTester = 2;
-#define  MSC_ON_TIMER  200
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
-class CSmartInvestParams : public CAppParams
-{
-   ObjectAttrProtected(int, Magic);
-   ObjectAttrBoolProtected(Martingale);
-   ObjectAttrProtected(double, Factor);
-   ObjectAttrProtected(int, TakeProfit);
-   ObjectAttrProtected(int, Step);
-   ObjectAttrProtected(double, Lot);
-   ObjectAttrProtected(double, MaxLot);
-   ObjectAttrProtected(int, LateStart);
-   ObjectAttrBoolProtected(CloseAtDrawDown);
-   ObjectAttrProtected(ENUM_DRAWDOWN_TYPE, DrawDownType);
-   ObjectAttrProtected(double, DrawDownToCloseValue);
-   ObjectAttrProtected(int, MaxTrades);
-   ObjectAttrProtected(int, SpreadFilter);
-
-
-   ObjectAttrBoolProtected(Hedge);
-   ObjectAttrProtected(ENUM_DRAWDOWN_TYPE, HedgeDrawDownType);
-   ObjectAttrProtected(double, HedgeDrawDownToCloseValue);
-
-   ObjectAttrBoolProtected(DisplayInformaion);
-   ObjectAttrProtected(string, Symbol);
-
-public:
-   bool               Check() override
-   {
-      /*
-       if(!CMQLInfo::IsTesting_() && !CAccount::IsDemo_())
-         {
-          Alert("This Expert Advisor is only available on demo accounts or strategy tester");
-          return false;
-         }
-      */
-      if(mMagic <= 0)
-      {
-         Alert("Magic Number cannot be negative");
-         return false;
-      }
-      if(mStep <= 0)
-      {
-         Alert("Step cannot pe negative or zero");
-         return false;
-      }
-      if(mFactor == 0)
-      {
-         Alert("Multiplier cannot be zero");
-         return false;
-      }
-      if(CString::IsEmptyOrNull(mSymbol))
-      {
-         mSymbol = Symbol();
-      }
-
-      string message = NULL;
-      mLot = (mLot != 0.0) ? mLot : CSymbolInfo::GetMinLot(mSymbol);
-
-      if(!CTradeUtils::IsLotsValid(mLot, mSymbol, message))
-      {
-         Alert(message);
-         return false;
-      }
-
-      if(!CTradeUtils::IsLotsValid(mMaxLot, mSymbol, message))
-      {
-         Alert(message);
-         return false;
-      }
-      if(mHedgeDrawDownToCloseValue <= 0 && mIsHedge)
-      {
-         LOG_ERROR("Drawdown value for hedge  should pe positive [value >= 0]");
-         Alert("Drawdown value for hedge  should pe positive [value >= 0]");
-         return false;
-      }
-      if(mDrawDownToCloseValue <= 0 && mIsCloseAtDrawDown)
-      {
-         LOG_ERROR("Drawdown value to close should pe positive [value >= 0]");
-         Alert("Drawdown value to close should pe positive [value >= 0]");
-         return false;
-      }
-
-      mDrawDownToCloseValue = -mDrawDownToCloseValue;
-      //mHedgeDrawDownToCloseValue = -mHedgeDrawDownToCloseValue;
-      if(CMQLInfo::IsTesting_()) //aici e ceva problema
-      {
-         lastOnTimerExecution =  TimeCurrent();
-      }
-
-      //mLateStart = 0;
-      mIsHedge = false;
-      return true;
-   }
-};
 
 
 //+------------------------------------------------------------------+
@@ -155,61 +49,28 @@ public:
 //+------------------------------------------------------------------+
 class CSmartInvestV3 : public CExpertAdvisor
 {
-   ObjectAttrProtected(int, Magic);
-   ObjectAttrBoolProtected(Martingale);
-   ObjectAttrProtected(double, Factor);
-   ObjectAttrProtected(int, TakeProfit);
-   ObjectAttrProtected(int, Step);
-   ObjectAttrProtected(double, Lot);
-   ObjectAttrProtected(double, MaxLot);
-   ObjectAttrProtected(int, LateStart);
-   ObjectAttrBoolProtected(CloseAtDrawDown);
-   ObjectAttrProtected(ENUM_DRAWDOWN_TYPE, DrawDownType);
-   ObjectAttrProtected(double, DrawDownToCloseValue);
-   ObjectAttrProtected(int, MaxTrades);
-   ObjectAttrBoolProtected(DisplayInformaion);
-   ObjectAttrProtected(string, Symbol);
-   ObjectAttrProtected(int, SpreadFilter);
 
-   ObjectAttrBoolProtected(Hedge);
-   ObjectAttrProtected(ENUM_DRAWDOWN_TYPE, HedgeDrawDownType);
-   ObjectAttrProtected(double, HedgeDrawDownToCloseValue);
 protected:
+   STradesDetails    _sTradeDetails;
+
+private:
    datetime          candleTime;
    ENUM_DIRECTION     _direction;
    CPositionInfo      _positionInfo;
    CTradeManager      _tradeManager;
    CHedgeBase*        hedge;
-   STradesDetails    _sTradeDetails;
+
    int                _currentGap;
+   CSmartInvestParams *_params;
 public:
-   ~CSmartInvestV3()
+                    ~CSmartInvestV3()
    {
       SafeDelete(hedge);
    }
-   CSmartInvestV3(CSmartInvestParams* params)
-      :
-      mMagic(params.GetMagic()),
-      mIsMartingale(params.IsMartingale()),
-      mFactor(params.GetFactor()),
-      mTakeProfit(params.GetTakeProfit()),
-      mStep(params.GetStep()),
-      mLot(params.GetLot()),
-      mMaxLot(params.GetMaxLot()),
-      mLateStart(params.GetLateStart()),
-      mIsCloseAtDrawDown(params.IsCloseAtDrawDown()),
-      mDrawDownType(params.GetDrawDownType()),
-      mDrawDownToCloseValue(params.GetDrawDownToCloseValue()),
-      mMaxTrades(params.GetMaxTrades()),
-      mSpreadFilter(params.GetSpreadFilter()),
-      mIsHedge(params.IsHedge()),
-      mHedgeDrawDownType(params.GetHedgeDrawDownType()),
-      mHedgeDrawDownToCloseValue(params.GetHedgeDrawDownToCloseValue()),
-      mSymbol(params.GetSymbol()),
-      mIsDisplayInformaion(params.IsDisplayInformaion())
+                     CSmartInvestV3(CSmartInvestParams* params): _params(params)
    {
-      if(mIsHedge)
-         hedge = new CHedgeCandles(mMagic, mSymbol, mHedgeDrawDownType, mHedgeDrawDownToCloseValue);
+      if(_params.IsHedge())
+         hedge = new CHedgeCandles(_params.GetMagic(), _params.GetSymbol(), _params.GetHedgeDrawDownType(), _params.GetHedgeDrawDownToCloseValue());
       else
          hedge = NULL;
 
@@ -220,14 +81,14 @@ public:
          hedge.RemoveLines();
       */
 
-      _tradeManager.SetMagic(mMagic);
-      _tradeManager.SetSymbol(mSymbol);
+      _tradeManager.SetMagic(_params.GetMagic());
+      _tradeManager.SetSymbol(_params.GetSymbol());
 
-      CTradeUtils::CalculateTradesDetails(_sTradeDetails, mMagic, mSymbol);
+      CTradeUtils::CalculateTradesDetails(_sTradeDetails, _params.GetMagic(), _params.GetSymbol());
       _direction = GetCurrentDirection();
 
       candleTime = 0;
-      CCandleInfo::IsNewCandle(candleTime, PERIOD_CURRENT, mSymbol);
+      CCandleInfo::IsNewCandle(candleTime, PERIOD_CURRENT, _params.GetSymbol());
 
       OnReInit();
 
@@ -261,6 +122,7 @@ protected:
    virtual bool               CheckDrawDownToClose();
    virtual double             GetDrawDown();
    virtual double             GetLots();
+   virtual int                GetStep();
 
    virtual void               ManageTrades();
    virtual void               ManageDrawDown();
@@ -277,16 +139,16 @@ protected:
 //+------------------------------------------------------------------+
 void CSmartInvestV3::Main()
 {
-   if(mIsHedge && CMQLInfo::IsTesting_() && TimeCurrent() > lastOnTimerExecution + timeToWaitInTester)
+   if(_params.IsHedge() && CMQLInfo::IsTesting_() && TimeCurrent() > lastOnTimerExecution + timeToWaitInTester)
    {
-      OnTimer();
+      //OnTimer(); //uncomment this
       lastOnTimerExecution =  TimeCurrent();
    }
 
-   if(CSymbolInfo::GetSpread(mSymbol) > mSpreadFilter)
+   if(CSymbolInfo::GetSpread(_params.GetSymbol()) > _params.GetSpreadFilter())
       return;
 
-   CTradeUtils::CalculateTradesDetails(_sTradeDetails, mMagic, mSymbol);
+   CTradeUtils::CalculateTradesDetails(_sTradeDetails, _params.GetMagic(), _params.GetSymbol());
 
    if(_sTradeDetails.totalPositions == 0 && _direction != ENUM_DIRECTION_NEUTRAL)
    {
@@ -294,7 +156,7 @@ void CSmartInvestV3::Main()
    }
 
    ManageDrawDown();
-   if(mIsHedge)
+   if(_params.IsHedge())
       if(hedge.IsActive())
          return;
 
@@ -306,7 +168,7 @@ void CSmartInvestV3::Main()
 //+------------------------------------------------------------------+
 void CSmartInvestV3::ManageTrades()
 {
-   if(!CCandleInfo::IsNewCandle(candleTime, PERIOD_CURRENT, mSymbol))
+   if(!CCandleInfo::IsNewCandle(candleTime, PERIOD_CURRENT, _params.GetSymbol()))
       return;
    bool tradeHasOpenedSuccessfully = false;
 
@@ -315,7 +177,7 @@ void CSmartInvestV3::ManageTrades()
       _direction = GetSignalFirstTrade();
       tradeHasOpenedSuccessfully = OpenTrade(_direction);
    }
-   else if(_sTradeDetails.totalPositions <= mMaxTrades)
+   else if(_sTradeDetails.totalPositions <= _params.GetMaxTrades())
    {
       ENUM_DIRECTION signal = GetSignalSubsequentTrades(_direction);
       tradeHasOpenedSuccessfully = OpenTrade(signal);
@@ -324,7 +186,7 @@ void CSmartInvestV3::ManageTrades()
    if(tradeHasOpenedSuccessfully)
    {
       ModifyTrades(_direction);
-      CTradeUtils::CalculateTradesDetails(_sTradeDetails, mMagic, mSymbol);
+      CTradeUtils::CalculateTradesDetails(_sTradeDetails, _params.GetMagic(), _params.GetSymbol());
    }
 }
 //+------------------------------------------------------------------+
@@ -332,47 +194,44 @@ void CSmartInvestV3::ManageTrades()
 //+------------------------------------------------------------------+
 void CSmartInvestV3::ManageDrawDown()
 {
-   if(mIsHedge)
+   if(_params.IsHedge())
       hedge.Main(_sTradeDetails, _direction);
 
-   if(mIsCloseAtDrawDown)
+   if(_params.IsCloseAtDrawDown())
    {
       double runningProfit = GetDrawDown();
-      if(runningProfit > mDrawDownToCloseValue)
+      if(runningProfit > _params.GetDrawDownToCloseValue())
          return;
 
       LOG_INFO(StringFormat("Closing all trades, drawdown on EA reached its value of %s, drawdown close type %s",
                             DoubleToString(runningProfit, 2),
-                            EnumToString(mDrawDownType)
+                            EnumToString(_params.GetDrawDownType())
                            ));
       int type = CEnums::FromDirectionToMarketOrder(_direction);
-      _tradeManager.CloseBatch(mMagic, mSymbol, type);
+      _tradeManager.CloseBatch(_params.GetMagic(), _params.GetSymbol(), type);
    }
-
-
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 void CSmartInvestV3::ManageDashboard()
 {
-   if(mIsDisplayInformaion)
+   if(_params.IsDisplayInformaion())
       DisplayExpertInfo();
 }
-
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
 double CSmartInvestV3::GetDrawDown()
 {
-   if(mDrawDownType == ENUM_DRAWDOWN_PERCENTAGE)
+   if(_params.GetDrawDownType() == ENUM_DRAWDOWN_PERCENTAGE)
    {
-      return CRiskService::RunningProfitBalancePercent(mMagic, mSymbol);
+      return CRiskService::RunningProfitBalancePercent(_params.GetMagic(), _params.GetSymbol());
    }
 
-   if(mDrawDownType == ENUM_DRAWDOWN_CASH)
+   if(_params.GetDrawDownType() == ENUM_DRAWDOWN_CASH)
    {
-      return CRiskService::RunningProfitCash(mMagic, mSymbol);
+      return CRiskService::RunningProfitCash(_params.GetMagic(), _params.GetSymbol());
    }
 
    return DBL_MAX;
@@ -382,7 +241,7 @@ double CSmartInvestV3::GetDrawDown()
 //+------------------------------------------------------------------+
 ENUM_DIRECTION CSmartInvestV3::GetSignalFirstTrade()
 {
-   return CSymbolInfo::CandleTypeBullishOrBearish(PERIOD_CURRENT, mSymbol);
+   return CSymbolInfo::CandleTypeBullishOrBearish(PERIOD_CURRENT, _params.GetSymbol());
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -421,8 +280,9 @@ ENUM_DIRECTION CSmartInvestV3::GetSignalSubsequentTrades(ENUM_DIRECTION directio
 
    _currentGap = distance;
 
+   int step = GetStep();
 // Return direction based on the distance value
-   return (distance < mStep) ? ENUM_DIRECTION_NEUTRAL : _direction;
+   return (distance < step) ? ENUM_DIRECTION_NEUTRAL : _direction;
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -441,8 +301,8 @@ bool CSmartInvestV3::OpenTrade(ENUM_DIRECTION direction = ENUM_DIRECTION_NEUTRAL
       return false; // If conversion fails, return false
 
 // Perform market trade and check for successful ticket
-   string comment = StringFormat("%s,#%d", IntegerToString(mMagic), _sTradeDetails.totalPositions + 1);
-   long ticket = _tradeManager.Market(orderType, lots, 0.0, 0.0);
+   string comment = StringFormat("%s,#%d", IntegerToString(_params.GetMagic()), _sTradeDetails.totalPositions);
+   long ticket = _tradeManager.Market(orderType, lots, 0.0, 0.0,comment);
    return (ticket > 0);
 }
 
@@ -451,12 +311,20 @@ bool CSmartInvestV3::OpenTrade(ENUM_DIRECTION direction = ENUM_DIRECTION_NEUTRAL
 //+------------------------------------------------------------------+
 double CSmartInvestV3::GetLots()
 {
-   if(_sTradeDetails.totalPositions < mLateStart || !mIsMartingale)
-      return mLot;
+   if(_sTradeDetails.totalPositions < _params.GetLateStart() || !_params.IsMartingale())
+      return _params.GetLot();
 
-   double lots =  CRiskService::GetVolumeBasedOnMartinGaleBatch(_sTradeDetails.totalPositions - mLateStart, mFactor, mSymbol, mLot, ENUM_TYPE_MARTINGALE_MULTIPLICATION);
+   double lots =  CRiskService::GetVolumeBasedOnMartinGaleBatch(_sTradeDetails.totalPositions - _params.GetLateStart(), _params.GetFactor(), _params.GetSymbol(), _params.GetLot(), ENUM_TYPE_MARTINGALE_MULTIPLICATION);
 
-   return (lots <= mMaxLot) ? lots : mMaxLot;
+   return (lots <= _params.GetMaxLot()) ? lots : _params.GetMaxLot();
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int CSmartInvestV3::GetStep(void)
+{
+   return _params.GetStep();
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -468,9 +336,9 @@ bool CSmartInvestV3::ModifyTrades(ENUM_DIRECTION direction)
 
    int type = (int) CEnums::FromDirectionToMarketOrder(direction);
 
-   double takeProfit = CRiskService::AveragingTakeProfitForBatch(type, mTakeProfit, mMagic, mSymbol);
+   double takeProfit = CRiskService::AveragingTakeProfitForBatch(type, _params.GetTakeProfit(), _params.GetMagic(), _params.GetSymbol());
 
-   return _tradeManager.ModifyMarketBatch(mMagic, 0.0, takeProfit, mSymbol, type, LOGGER_PREFIX_ERROR);
+   return _tradeManager.ModifyMarketBatch(_params.GetMagic(), 0.0, takeProfit, _params.GetSymbol(), type, LOGGER_PREFIX_ERROR);
 }
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -484,7 +352,7 @@ ENUM_DIRECTION CSmartInvestV3::GetCurrentDirection()
       if(!_positionInfo.SelectByIndex(index))
          continue;
 
-      if(_positionInfo.Symbol() != mSymbol || _positionInfo.Magic() != mMagic)
+      if(_positionInfo.Symbol() != _params.GetSymbol() || _positionInfo.Magic() != _params.GetMagic())
          continue;
 
       if(batchType == -1)
@@ -497,32 +365,15 @@ ENUM_DIRECTION CSmartInvestV3::GetCurrentDirection()
    }
    return directionTemp;
 }
-
-//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+//+------------------------------------------------------------------+
 //|                                                                  |
-//+------------------------------------------------------------------+
-void CSmartInvestV3::DisplayExpertInfo(void)
-{
-
-// hedge.DisplayHedgeDashBoard();
-// return;
-   string drawDownType = (mDrawDownType == ENUM_DRAWDOWN_PERCENTAGE) ? "Percent" : "Cash";
-   string space = "                                                                       ";
-   string dashboard = space + "SmartInvestBasic Dashboard";
-   dashboard += "\n" + space + "Direction: " + EnumToString(_direction);
-   //dashboard += "\n" + space + "Current Gap: " + IntegerToString(_currentGap);
-   dashboard += "\n" + space + "Number of Positions: " + IntegerToString(_sTradeDetails.totalPositions);
-   dashboard += "\n" + space + "Next Volume: " + DoubleToString(GetLots(), 2);
-   dashboard += "\n" + space + "DrawDown: " + DoubleToString(GetDrawDown(), 4) + " " + drawDownType;
-   dashboard += "\n" + space + "Costs: " + DoubleToString(_sTradeDetails.totalCosts, 3);
-   dashboard += "\n" + space + "GrossProfit: " + DoubleToString(_sTradeDetails.totalGrossProfit, 2);
-   dashboard += "\n" + space + "Spread: " + IntegerToString(CSymbolInfo::GetSpread(mSymbol));
-   Comment(dashboard);
-}
-
-//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+//+------------------------------------------------------------------+
 //|                                                                  |
-//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+//+------------------------------------------------------------------+
 void CSmartInvestV3::OnReInit(void)
 {
    _direction = GetCurrentDirection();
@@ -532,7 +383,7 @@ void CSmartInvestV3::OnReInit(void)
 //+------------------------------------------------------------------+
 void CSmartInvestV3::OnTimer_()
 {
-   if(mIsHedge)
+   if(_params.IsHedge())
       hedge.OnTimer_();
 }
 //+------------------------------------------------------------------+
@@ -540,27 +391,12 @@ void CSmartInvestV3::OnTimer_()
 //+------------------------------------------------------------------+
 void CSmartInvestV3::OnChartEvent_(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
-   if(mIsHedge)
+   if(_params.IsHedge())
       hedge.OnChartEvent_(id, lparam, dparam, sparam);
 }
 //+------------------------------------------------------------------+
 void CSmartInvestV3::PrintInputParams()
 {
-   string msg = StringFormat("%s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, %s = %s, ",
-                             nameOf(mMagic), IntegerToString(mMagic),
-                             nameOf(mIsMartingale), CString::FormatBool(mIsMartingale),
-                             nameOf(mFactor), DoubleToString(mFactor, 3),
-                             nameOf(mTakeProfit), IntegerToString(mTakeProfit),
-                             nameOf(mStep), IntegerToString(mStep),
-                             nameOf(mLot), DoubleToString(mLot, 3),
-                             nameOf(mMaxLot), DoubleToString(mMaxLot, 3),
-                             nameOf(mLateStart), IntegerToString(mLateStart),
-                             nameOf(mIsCloseAtDrawDown), CString::FormatBool(mIsCloseAtDrawDown),
-                             nameOf(mDrawDownType), EnumToString(mDrawDownType),
-                             nameOf(mDrawDownToCloseValue), DoubleToString(mDrawDownToCloseValue, 3),
-                             nameOf(mMaxTrades), IntegerToString(mMaxTrades)
-                            );
-   Print(msg);
 
 }
 //+------------------------------------------------------------------+
@@ -570,5 +406,24 @@ void CSmartInvestV3::OnDeinit_(const int reason)
    if(reason == REASON_PARAMETERS)
       PrintInputParams();
 #endif
+}
+//+------------------------------------------------------------------+
+void CSmartInvestV3::DisplayExpertInfo(void)
+{
+
+// hedge.DisplayHedgeDashBoard();
+// return;
+   string drawDownType = (_params.GetDrawDownType() == ENUM_DRAWDOWN_PERCENTAGE) ? "Percent" : "Cash";
+   string space = "                                                                       ";
+   string dashboard = space + "SmartInvest Dashboard";
+   dashboard += "\n" + space + "Direction: " + EnumToString(_direction);
+//dashboard += "\n" + space + "Current Gap: " + IntegerToString(_currentGap);
+   dashboard += "\n" + space + "Number of Positions: " + IntegerToString(_sTradeDetails.totalPositions);
+   dashboard += "\n" + space + "Next Volume: " + DoubleToString(GetLots(), 2);
+   dashboard += "\n" + space + "DrawDown: " + DoubleToString(GetDrawDown(), 4) + " " + drawDownType;
+   dashboard += "\n" + space + "Costs: " + DoubleToString(_sTradeDetails.totalCosts, 3);
+   dashboard += "\n" + space + "GrossProfit: " + DoubleToString(_sTradeDetails.totalGrossProfit, 2);
+   dashboard += "\n" + space + "Spread: " + IntegerToString(CSymbolInfo::GetSpread(_params.GetSymbol()));
+   Comment(dashboard);
 }
 //+------------------------------------------------------------------+
