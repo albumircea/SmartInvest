@@ -21,7 +21,7 @@ int timeToWaitInTester = 2;
 #include <Mircea/ExpertAdvisors/Hedge/HedgeCandles.mqh>
 
 
-const ulong __authorizedAccounts[] = {522562,533331,533332};
+const ulong __authorizedAccounts[] = {522562, 533331, 533332};
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -54,20 +54,21 @@ public:
    bool               Check() override
    {
 
-      if(!CAuthorization::Authorize(__authorizedAccounts))
-      {
-         Alert("This Expert Advisor is only available on demo accounts or strategy tester");
-         return false;
-      }
-      /*
-            if(!CMQLInfo::IsTesting_() && !CAccount::IsDemo_())
-            {
-               Alert("This Expert Advisor is only available on demo accounts or strategy tester");
-               return false;
-            }
-      */
 
-      //if(!CMQLInfo::IsTesting_()) return false;
+      /*
+         if(!CAuthorization::Authorize(__authorizedAccounts))
+         {
+            Alert("This Expert Advisor is only available on demo accounts or strategy tester");
+            return false;
+         }
+
+               if(!CMQLInfo::IsTesting_() && !CAccount::IsDemo_())
+               {
+                  Alert("This Expert Advisor is only available on demo accounts or strategy tester");
+                  return false;
+               }
+         */
+
 
       if(mMagic <= 0)
       {

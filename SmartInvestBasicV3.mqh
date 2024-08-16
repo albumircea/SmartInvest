@@ -10,6 +10,13 @@
 
 #include "SmartInvestBasicParams.mqh"
 
+
+/*
+TODO
+BUY ONLY/ SELL ONLY
+Shutdown after close
+
+*/
 /*
 FIXURI
 2024.01.12  - Fix pentru lateStart si Multiplier
@@ -17,7 +24,7 @@ FIXURI
 2024.02.22  - Fix lot formula (removed "+1")
 
 
-BUG cu calcularea distantei -> PriceCurrent vs Price open asta imi compara bid cu ask in loc sa compare bid cu bid si ask cu ask 399 (done)
+BUG cu calcularea distantei -> PriceCurrent vs Price open asta imi compara bid cu ask in loc sa compare bid cu bid si ask cu ask 399 -> DONE
 BUG IsSessionTrade pe MQL4 -> trebuie fixata metoda ca facem spam la mql4
 
 BUG/Upgrade la clasa cu new Candle ( si fac structuri sau clase cu lista de clase si sa verific symbolu structuri si sa fie obiecte diferite/creeate)
